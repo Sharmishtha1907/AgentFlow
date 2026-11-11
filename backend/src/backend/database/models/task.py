@@ -28,8 +28,7 @@ class Task(Base):
             "max_retries >= 0",
             name="check_task_max_retries"
         ),
-        Index("ix_tasks_status_created_at", "status", "created_at"),
-        Index("ix_tasks_execution_id", "execution_id"),
+        Index("ix_tasks_status_created_at", "status", "created_at")
     )
 
     id: Mapped[uuid.UUID] = mapped_column(
@@ -104,6 +103,11 @@ class Task(Base):
     result_reference: Mapped[str | None] = mapped_column(
         String(500),
         nullable=True
+    )
+
+    version: Mapped[int] = mapped_column(
+        default=1,
+        nullable=False
     )
 
     execution = relationship(

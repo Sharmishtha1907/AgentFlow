@@ -24,8 +24,7 @@ class TaskDependency(Base):
         "task_id",
         "depends_on_task_id",
         name="uq_task_dependency"
-        ),
-        Index("ix_task_dependencies_task_id", "task_id"),
+        )
     )
 
     id: Mapped[uuid.UUID] = mapped_column(

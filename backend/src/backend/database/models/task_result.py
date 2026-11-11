@@ -19,17 +19,6 @@ class TaskResults(Base):
 
     __tablename__ = "task_results"
 
-    __table_args__ = (
-        CheckConstraint(
-            "retry_count >= 0",
-            name="check_task_retry_count"
-        ),
-        CheckConstraint(
-            "max_retries >= 0",
-            name="check_task_max_retries"
-        ),
-    )
-
     id: Mapped[uuid.UUID] = mapped_column(
         Uuid(as_uuid=True),
         primary_key=True,
@@ -45,7 +34,6 @@ class TaskResults(Base):
 
     attempt_number: Mapped[int] = mapped_column(
         Integer,
-        ForeignKey("attempts.attempt_number"),
         nullable=False,
         index=True
     )
@@ -63,12 +51,6 @@ class TaskResults(Base):
     task = relationship(
         "Task",
         back_populates="task_results"
-    )
-
-    attempts = relationship(
-        "TaskAttempt",
-        back_populates="task",
-        cascade="all, delete-orphan"
     )
 
     

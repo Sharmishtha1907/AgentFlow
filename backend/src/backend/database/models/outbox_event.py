@@ -11,7 +11,7 @@ from sqlalchemy import (
 )
 from sqlalchemy import Uuid
 from sqlalchemy.orm import Mapped, mapped_column
-
+from sqlalchemy.dialects.postgresql import JSONB
 from backend.database.base import Base
 
 
@@ -42,7 +42,7 @@ class OutboxEvent(Base):
     )
 
     payload: Mapped[dict] = mapped_column(
-        JSON,
+        JSONB,
         nullable=False
     )
 
