@@ -9,15 +9,34 @@ from sqlalchemy import (
     JSON,
     func,
     CheckConstraint,
+    UniqueConstraint
 )
 from sqlalchemy import Uuid
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.dialects.postgresql import JSONB
 from backend.database.base import Base
+from sqlalchemy import ForeignKeyConstraint
 
 class TaskResults(Base):
 
     __tablename__ = "task_results"
+
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["task_id", "attempt_number"],
+            [
+                "task_attempts.task_id",
+                "task_attempts.attempt_number"
+            ],
+            ondelete="CASCADE",
+            name="fk_task_result_attempt"
+        ),
+        UniqueConstraint(
+            "task_id",
+            "attempt_number",
+            name="uq_task_result_attempt"
+        ),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(
         Uuid(as_uuid=True),
@@ -43,7 +62,7 @@ class TaskResults(Base):
         nullable=True
     )
 
-    output__hash: Mapped[str | None] = mapped_column(
+    output_hash: Mapped[str | None] = mapped_column(
         String(64),
         nullable=True
     )
