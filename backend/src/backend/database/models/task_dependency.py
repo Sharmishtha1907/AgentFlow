@@ -11,11 +11,6 @@ class TaskDependency(Base):
     __tablename__ = "task_dependencies"
 
     __table_args__ = (
-        UniqueConstraint(
-            "task_id",
-            "depends_on_task_id",
-            name="uq_task_dependency"
-        ),
         CheckConstraint(
             "task_id != depends_on_task_id",
             name="check_no_self_dependency"
