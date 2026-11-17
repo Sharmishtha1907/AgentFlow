@@ -11,8 +11,6 @@ DATABASE_URL = (
     f"{config.DB_HOST}:{config.DB_PORT}/"
     f"{config.DB_NAME}"
 )
-print("DATABASE_URL:", DATABASE_URL)  # Debugging line to print the constructed URL
-
 engine = create_engine(
     DATABASE_URL,
     pool_pre_ping=True,
