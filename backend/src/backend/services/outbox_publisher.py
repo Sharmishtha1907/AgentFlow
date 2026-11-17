@@ -108,6 +108,7 @@ class OutboxPublisher:
             "TASK_CREATED": "agentflow.tasks",
             "TASK_READY": "agentflow.tasks",
             "TASK_COMPLETED": "agentflow.task-results",
+            "TASK_CANCELLED": "agentflow.tasks"
         }
 
         topic = topic_mapping.get(event_type)

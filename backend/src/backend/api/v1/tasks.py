@@ -83,7 +83,7 @@ def get_task_by_id(
 
 
 @router.patch(
-    "/{task_id}/status",
+    "/{task_id}/cancel",
     response_model=task_schema.Task,
     status_code=status.HTTP_200_OK
 )
@@ -92,7 +92,7 @@ def update_task_status(
     input: task_schema.TaskStatusUpdate,
     db: Session = Depends(get_db)
 ):
-    return tasks_crud.update_task_status(
+    return tasks_crud.cancel_task(
         task_id=task_id,
         new_status=input.new_status,
         db=db
@@ -126,6 +126,21 @@ def delete_task(
     db: Session = Depends(get_db)
 ):
     return tasks_crud.delete_task(
+        task_id=task_id,
+        db=db
+    )
+
+@router.patch(
+    "/{task_id}/status",
+    response_model=task_schema.Task,
+    status_code=status.HTTP_200_OK
+)
+def update_task_status(
+    task_id: uuid.UUID,
+    input: task_schema.TaskStatusUpdate,
+    db: Session = Depends(get_db)
+):
+    return tasks_crud.cancel_task(
         task_id=task_id,
         db=db
     )

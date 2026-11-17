@@ -17,7 +17,6 @@ def create_attempt(
     db: Session
 ):
     try:
-        # Verify that the parent task exists.
         task = db.get(Task, input.task_id)
 
         if not task:
@@ -34,25 +33,25 @@ def create_attempt(
         )
 
         db.add(attempt)
-        db.commit()
+        db.flush()
         db.refresh(attempt)
 
         return task_attempt_schema.TaskAttempt.model_validate(attempt)
 
-    except IntegrityError:
-        db.rollback()
+    except HTTPException:
+        raise
+
+    except IntegrityError as error:
         raise HTTPException(
             status_code=409,
             detail="Attempt number already exists for this task"
-        )
+        ) from error
 
-    except SQLAlchemyError:
-        db.rollback()
+    except SQLAlchemyError as error:
         raise HTTPException(
             status_code=500,
             detail="Database error while creating task attempt"
-        )
-
+        ) from error
 
 def get_attempt_by_id(
     attempt_id: UUID,

@@ -1,6 +1,7 @@
 from pydantic import BaseModel, Field, ConfigDict
 from datetime import datetime
 import uuid
+from typing import Literal
 
 #TASK
 class TaskCreate(BaseModel):
@@ -30,8 +31,9 @@ class Task(BaseModel):
 
 
 
+
 class TaskStatusUpdate(BaseModel):
-    new_status: str
+    new_status: Literal["CANCELLED"]
 
 
 class TaskResultUpdate(BaseModel):

@@ -2,6 +2,8 @@ from backend.database.session import get_db
 from backend.schemas import tasks
 from backend.database.models import Task, Execution
 import uuid
+from datetime import datetime, timezone
+
 from backend.database.crud.outbox_event_crud import create_outbox_event
 from backend.schemas import outbox_event as outbox_schema
 from fastapi import HTTPException, status
@@ -156,15 +158,45 @@ def get_all_tasks(
         )
 
 
-def update_task_status(
+def cancel_task(
     task_id: uuid.UUID,
-    new_status: str,
     db: Session
 ):
     try:
-        task = db.query(Task).filter(
-            Task.id == task_id
-        ).first()
+        # 1. Find execution_id
+        execution_id = (
+            db.query(Task.execution_id)
+            .filter(Task.id == task_id)
+            .scalar()
+        )
+
+        if execution_id is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Task not found."
+            )
+
+        # 2. Lock execution first
+        execution = (
+            db.query(Execution)
+            .filter(Execution.id == execution_id)
+            .with_for_update()
+            .first()
+        )
+
+        if not execution:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Execution not found."
+            )
+
+        # 3. Lock task
+        task = (
+            db.query(Task)
+            .filter(Task.id == task_id)
+            .with_for_update()
+            .first()
+        )
 
         if not task:
             raise HTTPException(
@@ -172,20 +204,58 @@ def update_task_status(
                 detail="Task not found."
             )
 
-        task.status = new_status
+        # 4. Validate cancellation
+        cancellable_states = {
+            "PENDING",
+            "READY",
+            "RETRY_WAIT"
+        }
 
+        if task.status not in cancellable_states:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=f"Task cannot be cancelled from status {task.status}."
+            )
+
+        # 5. Update task
+        task.status = "CANCELLED"
+        task.completed_at = datetime.now(timezone.utc)
+        task.error_message = None
+        task.version += 1
+
+        # 6. Create outbox event
+        event_input = outbox_schema.OutboxEventCreate(
+            aggregate_type="TASK",
+            aggregate_id=task.id,
+            event_type="TASK_CANCELLED",
+            payload={
+                "task_id": str(task.id),
+                "execution_id": str(task.execution_id)
+            }
+        )
+
+        create_outbox_event(
+            input=event_input,
+            db=db
+        )
+
+        # 7. Commit atomically
         db.commit()
         db.refresh(task)
 
         return tasks.Task.model_validate(task)
 
-    except SQLAlchemyError:
+    except HTTPException:
+        db.rollback()
+        raise
+
+    except SQLAlchemyError as error:
         db.rollback()
 
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to update task status due to a database error."
-        )
+            detail="Failed to cancel task."
+        ) from error
 
 
 def update_task_result(
