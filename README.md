@@ -326,34 +326,7 @@ Important design principles:
 - Failed tasks should be retried according to their retry policy.
 - Permanently failing events should eventually be routed to a dead-letter topic.
 
-## 10. Development Roadmap
-
-| Component | Status |
-|---|---|
-| Project setup | Completed |
-| Docker infrastructure | Completed |
-| PostgreSQL connectivity | Completed |
-| Database models | Completed |
-| Database table creation | Completed |
-| Execution CRUD and APIs | Completed |
-| Task CRUD and APIs | Completed |
-| Dependency CRUD and APIs | Completed |
-| Task attempt CRUD | Completed |
-| Task result CRUD and APIs | Completed |
-| Outbox model and CRUD | Implemented; review ongoing |
-| Kafka broker setup | Completed |
-| Kafka topic creation | Completed |
-| Kafka producer | Initial implementation created |
-| Outbox Publisher | In progress |
-| Scheduler | Pending |
-| Planner Agent | Pending |
-| Kafka Consumer | Pending |
-| Worker execution | Pending |
-| Result processing and aggregation | Pending |
-| End-to-end integration | Pending |
-| Automated testing | Pending |
-
-## 11. Future Improvements
+## 10. Future Improvements
 
 - Add Alembic for schema migrations.
 - Implement scheduler concurrency and recovery.
@@ -365,7 +338,7 @@ Important design principles:
 - Add integration and end-to-end tests.
 - Evaluate Kubernetes for deployment and worker scaling.
 
-## 12. Project Goal
+## 11. Project Goal
 
 The goal of AgentFlow is to build a reliable, extensible distributed agent execution platform capable of converting complex natural-language requests into dependency-aware workflows and executing them through independently scalable workers.
 
