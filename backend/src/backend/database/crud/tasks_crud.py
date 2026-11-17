@@ -1,6 +1,5 @@
 from backend.database.session import get_db
 from backend.schemas import tasks
-from requests import Session
 from backend.database.models import Task, Execution
 import uuid
 from backend.database.crud.outbox_event_crud import create_outbox_event

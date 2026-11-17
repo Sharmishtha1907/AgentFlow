@@ -59,7 +59,20 @@ def create_task_dependency(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Execution not found."
             )
+        active_tasks = (
+            db.query(Task.id)
+            .filter(
+                Task.execution_id == execution.id,
+                Task.status != "PENDING"
+            )
+            .first()
+            )
 
+        if active_tasks:
+            raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Dependencies cannot be modified after task scheduling begins."
+        )
         # Prevent duplicate dependencies
         existing_dependency = db.query(TaskDependency).filter(
             TaskDependency.task_id == input.task_id,
@@ -128,6 +141,10 @@ def create_task_dependency(
         return dependency_schema.TaskDependency.model_validate(
             dependency
         )
+
+    except HTTPException:
+        db.rollback()
+        raise
 
     except IntegrityError:
         db.rollback()
@@ -284,14 +301,18 @@ def get_dependencies_by_execution(
 
 
 # DELETE: Delete a task dependency
+
 def delete_task_dependency(
     dependency_id: uuid.UUID,
     db: Session
 ):
     try:
-        dependency = db.query(TaskDependency).filter(
-            TaskDependency.id == dependency_id
-        ).first()
+        # 1. Find the dependency to identify its execution.
+        dependency = (
+            db.query(TaskDependency)
+            .filter(TaskDependency.id == dependency_id)
+            .first()
+        )
 
         if not dependency:
             raise HTTPException(
@@ -299,12 +320,75 @@ def delete_task_dependency(
                 detail="Task dependency not found."
             )
 
+        # 2. Identify the execution.
+        task = (
+            db.query(Task)
+            .filter(Task.id == dependency.task_id)
+            .first()
+        )
+
+        if not task:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Dependent task not found."
+            )
+
+        # 3. Acquire the common execution-level lock.
+        execution = (
+            db.query(Execution)
+            .filter(Execution.id == task.execution_id)
+            .with_for_update()
+            .first()
+        )
+
+        if not execution:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Execution not found."
+            )
+
+        # 4. Freeze dependency graph after scheduling begins.
+        active_tasks = (
+            db.query(Task.id)
+            .filter(
+                Task.execution_id == execution.id,
+                Task.status != "PENDING"
+            )
+            .first()
+        )
+
+        if active_tasks:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Dependencies cannot be modified after task scheduling begins."
+            )
+
+        # 5. Re-fetch and lock the dependency.
+        # Another transaction may have deleted it while we waited.
+        dependency = (
+            db.query(TaskDependency)
+            .filter(TaskDependency.id == dependency_id)
+            .with_for_update()
+            .first()
+        )
+
+        if not dependency:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Task dependency not found."
+            )
+
+        # 6. Delete and commit.
         db.delete(dependency)
         db.commit()
 
         return {
             "detail": "Task dependency deleted successfully."
         }
+
+    except HTTPException:
+        db.rollback()
+        raise
 
     except SQLAlchemyError:
         db.rollback()
@@ -313,3 +397,4 @@ def delete_task_dependency(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to delete task dependency."
         )
+
