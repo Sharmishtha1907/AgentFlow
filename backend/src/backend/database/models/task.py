@@ -133,3 +133,9 @@ class Task(Base):
         foreign_keys="TaskDependency.depends_on_task_id",
         back_populates="depends_on_task"
     )
+
+    task_results = relationship(
+    "TaskResults",
+    back_populates="task",
+    cascade="all, delete-orphan"
+    )

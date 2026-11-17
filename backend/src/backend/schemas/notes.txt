@@ -1,0 +1,57 @@
+One important missing validation
+Your database currently prevents:
+- Self-dependencies.
+- Duplicate dependencies.
+- References to nonexistent tasks.
+But it does not prevent circular dependencies.
+
+For example:
+Task A
+Task B
+
+
+Task C
+Task B
+
+A circular dependency can prevent execution from progressing.
+
+For example:
+- A depends on B.
+- B depends on C.
+- C depends on A.
+No task can start.
+
+We'll implement cycle detection in the dependency service before inserting relationships.
+
+Another important validation: both tasks must belong to the same execution. A task in Execution 1 should not depend on a task in Execution 2. We'll enforce this in CRUD/service logic.
+
+There are two common graph algorithms for cycle detection:
+- DFS: Explore prerequisite relationships and detect whether the proposed edge creates a cycle.
+- Kahn's algorithm: Use incoming-edge counts (indegree) and repeatedly remove nodes with no remaining prerequisites. If nodes remain, the graph contains a cycle.
+For our current implementation, DFS is simpler because we're checking whether one newly proposed dependency introduces a cycle.
+
+Kahn's algorithm will be particularly useful later when we implement the scheduler and need to identify tasks whose dependencies are all satisfied.
+
+The key takeaway: A linked list represents a sequence. AgentFlow dependencies represent a graph because tasks can branch, merge, and have multiple prerequisites.
+
+
+Attempt------------->
+
+Important distinction: CRUD vs API
+Your current API file exposes three GET endpoints. That's intentional.
+
+The internal system will call:
+- create_attempt() when a worker claims a task.
+- update_attempt_status() when execution succeeds or fails.
+- The GET functions when the API needs to display attempt history.
+This keeps clients from manipulating worker execution records directly.
+4. Manual verification
+Once you've implemented the CRUD, verify the endpoints in Swagger:
+
+http://localhost:8000/docs
+
+Try:
+- Fetching an attempt by ID.
+- Fetching attempts by task ID.
+- Fetching all attempts with offset and limit.
+Next, we should implement the TaskResult CRUD and APIs. That will complete the persistence layer for task execution records before we move to the scheduler and worker logic.

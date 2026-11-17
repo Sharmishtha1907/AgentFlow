@@ -73,5 +73,5 @@ class TaskAttempt(Base):
 
     task = relationship(
         "Task",
-        back_populates="task_attempts"
+        back_populates="attempts"
     )

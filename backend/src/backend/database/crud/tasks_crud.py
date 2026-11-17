@@ -3,10 +3,12 @@ from backend.schemas import tasks
 from requests import Session
 from backend.database.models import Task, Execution
 import uuid
-
+from backend.database.crud.outbox_event_crud import create_outbox_event
+from backend.schemas import outbox_event as outbox_schema
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import SQLAlchemyError
+
 
 
 def create_task(
@@ -14,27 +16,52 @@ def create_task(
     db: Session
 ):
     try:
+        # 1. Create the task
         t = Task(
             execution_id=input.execution_id,
-            task_type=input.original_request,
+            task_type=input.task_type,
+            description=input.description,
             status="PENDING",
-            priority= 1,
-            retry_count= 0,
-            max_retries= 3  
+            priority=input.priority,
+            retry_count=0,
+            max_retries=input.max_retries,
         )
+
         db.add(t)
+
+        # 2. Flush to generate task ID without committing
+        db.flush()
+
+        # 3. Create the corresponding outbox event
+        event_input = outbox_schema.OutboxEventCreate(
+            aggregate_type="TASK",
+            aggregate_id=t.id,
+            event_type="TASK_CREATED",
+            payload={
+                "task_id": str(t.id),
+                "execution_id": str(t.execution_id),
+                "task_type": t.task_type,
+                "description": t.description,
+                "priority": t.priority,
+            },
+        )
+
+        create_outbox_event(
+            input=event_input,
+            db=db,
+        )
+
+        # 4. Commit task and event together
         db.commit()
         db.refresh(t)
-        
+
         return tasks.Task.model_validate(t)
 
-    except SQLAlchemyError:
+    except SQLAlchemyError as error:
         db.rollback()
 
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to create task due to a database error."
-        )
+        print("TASK CREATION ERROR:", repr(error))
+        raise
 
 
 def get_task_by_id(

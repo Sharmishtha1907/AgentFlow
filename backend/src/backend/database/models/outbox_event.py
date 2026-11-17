@@ -6,7 +6,9 @@ from sqlalchemy import (
     String,
     DateTime,
     ForeignKey,
-    JSON,
+    text,
+    Text,
+    CheckConstraint,
     func,
 )
 from sqlalchemy import Uuid
@@ -18,16 +20,29 @@ from backend.database.base import Base
 
 class OutboxEvent(Base):
 
-    __table_args__ = (
-        Index("ix_outbox_events_published_at", "published_at"),
-    )
-
     __tablename__ = "outbox_events"
+
+    __table_args__ = (
+        CheckConstraint(
+            "publish_attempts >= 0",
+            name="check_outbox_publish_attempts"
+        ),
+        Index(
+            "ix_outbox_events_unpublished",
+            "created_at",
+            postgresql_where=text("published_at IS NULL")
+        ),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(
         Uuid(as_uuid=True),
         primary_key=True,
         default=uuid.uuid4
+    )
+
+    aggregate_type: Mapped[str] = mapped_column(
+        String(30),
+        nullable=False
     )
 
     aggregate_id: Mapped[uuid.UUID] = mapped_column(
@@ -60,5 +75,20 @@ class OutboxEvent(Base):
     publish_attempts: Mapped[int] = mapped_column(
         Integer,
         nullable=False,
-        default=0  
+        default=0,
+        server_default=text("0")
+    )
+    locked_by: Mapped[str | None] = mapped_column(
+        String(100),
+        nullable=True
+    )
+
+    locked_until: Mapped[DateTime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True
+    )
+
+    last_error: Mapped[str | None] = mapped_column(
+        Text,
+        nullable=True
     )

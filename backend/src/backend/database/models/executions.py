@@ -74,3 +74,8 @@ class Execution(Base):
         back_populates="execution",
         cascade="all, delete-orphan"
     )
+
+    execution_results = relationship(
+        "ExecutionResults",
+        back_populates="execution"
+    )
