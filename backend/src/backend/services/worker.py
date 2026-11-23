@@ -6,9 +6,10 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func
 from sqlalchemy.exc import SQLAlchemyError
 
-from backend.database.models import Task, Execution, TaskAttempt
+from backend.database.models import Task, TaskAttempt
 from backend.database.crud.task_attempt_crud import create_attempt
 from backend.database.crud.outbox_event_crud import create_outbox_event
+from backend.database.crud.task_result_crud import create_task_result
 from backend.schemas import task_attempt as task_attempt_schema
 from backend.schemas import outbox_event as outbox_schema
 from backend.schemas import task_result as task_result_schema
@@ -19,34 +20,8 @@ def claim_task(
     db: Session
 ):
     try:
-        # 1. Find execution ID
-        execution_id = (
-            db.query(Task.execution_id)
-            .filter(Task.id == task_id)
-            .scalar()
-        )
 
-        if execution_id is None:
-            raise HTTPException(
-                status_code=404,
-                detail="Task not found."
-            )
-
-        # 2. Lock execution first
-        execution = (
-            db.query(Execution)
-            .filter(Execution.id == execution_id)
-            .with_for_update()
-            .first()
-        )
-
-        if not execution:
-            raise HTTPException(
-                status_code=404,
-                detail="Execution not found."
-            )
-
-        # 3. Lock task
+        # 1. Lock task
         task = (
             db.query(Task)
             .filter(Task.id == task_id)
@@ -60,14 +35,14 @@ def claim_task(
                 detail="Task not found."
             )
 
-        # 4. Validate task state
+        # 2. Validate task state
         if task.status != "READY":
             raise HTTPException(
                 status_code=409,
                 detail=f"Task cannot be claimed from status {task.status}."
             )
 
-        # 5. Allocate next attempt number
+        # 3. Allocate next attempt number
         last_attempt_number = (
             db.query(func.max(TaskAttempt.attempt_number))
             .filter(TaskAttempt.task_id == task.id)
@@ -76,7 +51,7 @@ def claim_task(
 
         attempt_number = (last_attempt_number or 0) + 1
 
-        # 6. Create attempt inside the current transaction
+        # 4. Create attempt inside the current transaction
         attempt_input = task_attempt_schema.TaskAttemptCreate(
             task_id=task.id,
             attempt_number=attempt_number,
@@ -88,7 +63,7 @@ def claim_task(
             db=db
         )
 
-        # 7. Update task state
+        # 5. Update task state
         task.status = "RUNNING"
 
         if task.started_at is None:
@@ -97,7 +72,13 @@ def claim_task(
         task.error_message = None
         task.version += 1
 
-        # 8. Create outbox event
+        if not worker_id or not worker_id.strip():
+            raise HTTPException(
+                status_code=400,
+                detail="Worker ID cannot be empty."
+            )
+
+        # 6. Create outbox event
         event_input = outbox_schema.OutboxEventCreate(
             aggregate_type="TASK",
             aggregate_id=task.id,
@@ -115,7 +96,7 @@ def claim_task(
             db=db
         )
 
-        # 9. Commit everything atomically
+        # 7. Commit everything atomically
         db.commit()
         db.refresh(task)
 
@@ -146,34 +127,8 @@ def complete_task(
     db: Session
 ):
     try:
-        # 1. Find execution ID
-        execution_id = (
-            db.query(Task.execution_id)
-            .filter(Task.id == task_id)
-            .scalar()
-        )
 
-        if execution_id is None:
-            raise HTTPException(
-                status_code=404,
-                detail="Task not found."
-            )
-
-        # 2. Lock execution first
-        execution = (
-            db.query(Execution)
-            .filter(Execution.id == execution_id)
-            .with_for_update()
-            .first()
-        )
-
-        if not execution:
-            raise HTTPException(
-                status_code=404,
-                detail="Execution not found."
-            )
-
-        # 3. Lock task
+        # 1. Lock task
         task = (
             db.query(Task)
             .filter(Task.id == task_id)
@@ -193,7 +148,7 @@ def complete_task(
                 detail=f"Task cannot be completed from status {task.status}."
             )
 
-        # 4. Lock the corresponding attempt
+        # 2. Lock the corresponding attempt
         attempt = (
             db.query(TaskAttempt)
             .filter(
@@ -210,7 +165,25 @@ def complete_task(
                 detail="Task attempt not found."
             )
 
-        # 5. Validate attempt ownership and state
+        latest_attempt_number = (
+        db.query(func.max(TaskAttempt.attempt_number))
+        .filter(TaskAttempt.task_id == task.id)
+        .scalar()
+        )
+
+        if attempt_number != latest_attempt_number:
+            raise HTTPException(
+                status_code=409,
+                detail="This is not the latest task attempt."
+            )
+
+        if not worker_id or not worker_id.strip():
+            raise HTTPException(
+                status_code=400,
+                detail="Worker ID cannot be empty."
+            )
+
+        # 3. Validate attempt ownership and state
         if attempt.worker_id != worker_id:
             raise HTTPException(
                 status_code=403,
@@ -223,7 +196,7 @@ def complete_task(
                 detail=f"Attempt cannot be completed from status {attempt.status}."
             )
 
-        # 6. Create task result inside the current transaction
+        # 4. Create task result inside the current transaction
         result_input = task_result_schema.TaskResultCreate(
             task_id=task_id,
             attempt_number=attempt_number,
@@ -235,21 +208,21 @@ def complete_task(
             db=db
         )
 
-        # 7. Complete the attempt
+        # 5. Complete the attempt
         now = datetime.now(timezone.utc)
 
         attempt.status = "COMPLETED"
         attempt.completed_at = now
         attempt.error_message = None
 
-        # 8. Complete the task
+        # 6. Complete the task
         task.status = "COMPLETED"
         task.completed_at = now
         task.error_message = None
         task.result_reference = str(result.id)
         task.version += 1
 
-        # 9. Create completion event
+        # 7. Create completion event
         event_input = outbox_schema.OutboxEventCreate(
             aggregate_type="TASK",
             aggregate_id=task.id,
@@ -268,7 +241,7 @@ def complete_task(
             db=db
         )
 
-        # 10. Commit everything atomically
+        # 8. Commit everything atomically
         db.commit()
         db.refresh(task)
 
