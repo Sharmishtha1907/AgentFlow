@@ -69,26 +69,23 @@ def create_task_result(
         )
 
         db.add(result)
-        db.commit()
+        db.flush()
         db.refresh(result)
 
         return task_result_schema.TaskResult.model_validate(result)
 
-    except IntegrityError:
-        db.rollback()
+    except IntegrityError as error:
         raise HTTPException(
             status_code=409,
             detail="Result already exists for this attempt"
-        )
+        ) from error
 
-    except SQLAlchemyError:
-        db.rollback()
+    except SQLAlchemyError as error:
         raise HTTPException(
             status_code=500,
             detail="Database error while creating task result"
-        )
-
-
+        ) from error
+    
 # 2. GET TASK RESULT BY ID
 def get_task_result_by_id(
     result_id: UUID,
