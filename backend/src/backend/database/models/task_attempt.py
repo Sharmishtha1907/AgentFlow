@@ -7,6 +7,7 @@ from sqlalchemy import (
     DateTime,
     ForeignKey,
     UniqueConstraint,
+    CheckConstraint,
     func,
 )
 from sqlalchemy import Uuid
@@ -23,6 +24,10 @@ class TaskAttempt(Base):
             "task_id",
             "attempt_number",
             name="uq_task_attempt_number"
+        ),
+        CheckConstraint(
+            "attempt_number >= 1",
+            name="check_attempt_number_positive"
         ),
     )
 
