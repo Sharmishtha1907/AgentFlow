@@ -65,30 +65,6 @@ def get_unpublished_events(
     ]
 
 
-
-def mark_event_as_published(
-    event_id: uuid.UUID,
-    db: Session
-):
-    """
-    Mark an event as successfully published.
-
-    Call this only after Kafka acknowledges the message.
-    """
-
-    event = db.get(OutboxEventModel, event_id)
-
-    if not event:
-        return None
-
-    if event.published_at is None:
-        event.published_at = datetime.now(timezone.utc)
-
-    db.flush()
-
-    return outbox_schema.OutboxEvent.model_validate(event)
-
-
 def update_event_failure(
     event_id: uuid.UUID,
     db: Session
