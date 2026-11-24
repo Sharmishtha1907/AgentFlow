@@ -26,6 +26,7 @@ class Task(BaseModel):
     error_message: str | None = None
     result_reference: str | None = None
     version: int
+    next_retry_at: datetime | None = None
 
     model_config = ConfigDict(from_attributes=True)
 

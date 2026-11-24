@@ -110,6 +110,11 @@ class Task(Base):
         nullable=False
     )
 
+    next_retry_at: Mapped[DateTime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True
+    )
+
     execution = relationship(
         "Execution",
         back_populates="tasks"
