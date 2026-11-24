@@ -6,3 +6,4 @@ from backend.database.models.task_attempt import TaskAttempt
 from backend.database.models.outbox_event import OutboxEvent
 from backend.database.models.task_result import TaskResults
 from backend.database.models.execution_result import ExecutionResults
+from backend.database.models.inbox_event import InboxEvent

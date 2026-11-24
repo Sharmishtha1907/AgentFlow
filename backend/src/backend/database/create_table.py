@@ -11,6 +11,7 @@ from backend.database.models import (
     OutboxEvent,
     TaskResults,
     ExecutionResults,
+    InboxEvent
 )
 
 Base.metadata.create_all(bind=engine)
